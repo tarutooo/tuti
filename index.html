@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通知アプリ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0056CC;
+        }
+
+        /* 通知コンテナ */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        /* 通知カード */
+        .notification {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 10px;
+            min-width: 300px;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transform: translateX(400px);
+            opacity: 0;
+            animation: slideIn 0.5s ease-out forwards;
+            pointer-events: all;
+            position: relative;
+        }
+
+        .notification.removing {
+            animation: slideOut 0.3s ease-in forwards;
+        }
+
+        @keyframes slideIn {
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .notification-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .notification-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            border-radius: 4px;
+        }
+
+        .notification-app {
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+            flex: 1;
+        }
+
+        .notification-time {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .notification-message {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .notification-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #999;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 0;
+            box-shadow: none;
+            background: transparent;
+        }
+
+        .notification-close:hover {
+            background: rgba(0, 0, 0, 0.1);
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* 通知タイプ別のスタイル */
+        .notification.info {
+            border-left: 4px solid #007AFF;
+        }
+
+        .notification.success {
+            border-left: 4px solid #34C759;
+        }
+
+        .notification.warning {
+            border-left: 4px solid #FF9500;
+        }
+
+        .notification.error {
+            border-left: 4px solid #FF3B30;
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .active-timers {
+            margin-top: 30px;
+        }
+
+        .timer-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timer-info {
+            flex: 1;
+        }
+
+        .timer-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .timer-countdown {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .cancel-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .cancel-btn:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>通知タイマー</h1>
+        
+        <div class="input-group">
+            <label for="notificationName">通知名:</label>
+            <input type="text" id="notificationName" placeholder="例: 休憩時間" required>
+        </div>
+
+        <div class="input-group">
+            <label for="seconds">何秒後に通知？:</label>
+            <input type="number" id="seconds" placeholder="例: 30" min="1" max="86400" required>
+        </div>
+
+        <div class="controls">
+            <button onclick="setNotification()">通知をセット</button>
+            <button onclick="cancelAllTimers()">全てキャンセル</button>
+        </div>
+
+        <div id="activeTimers" class="active-timers"></div>
+    </div>
+
+    <!-- 通知コンテナ -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <script>
+        // タイマー管理
+        let activeTimers = [];
+        let timerId = 0;
+
+        // 通知をセットする関数
+        function setNotification() {
+            const name = document.getElementById('notificationName').value.trim();
+            const seconds = parseInt(document.getElementById('seconds').value);
+
+            if (!name) {
+                alert('通知名を入力してください');
+                return;
+            }
+
+            if (!seconds || seconds < 1) {
+                alert('正しい時間を入力してください（1秒以上）');
+                return;
+            }
+
+            // タイマーオブジェクトを作成
+            const timer = {
+                id: timerId++,
+                name: name,
+                seconds: seconds,
+                startTime: Date.now(),
+                timeoutId: null
+            };
+
+            // タイマーを設定
+            timer.timeoutId = setTimeout(() => {
+                // 通知を表示
+                const timeText = seconds >= 60 ? 
+                    `${Math.floor(seconds / 60)}分${seconds % 60}秒` : 
+                    `${seconds}秒`;
+                createNotification('通知タイマー', timer.name, `${timeText}が経過しました`);
+                
+                // タイマーリストから削除
+                removeTimer(timer.id);
+            }, seconds * 1000);
+
+            // アクティブタイマーリストに追加
+            activeTimers.push(timer);
+            
+            // 画面を更新
+            updateTimerDisplay();
+            
+            // フォームをクリア
+            document.getElementById('notificationName').value = '';
+            document.getElementById('seconds').value = '';
+
+            const timeText = seconds >= 60 ? 
+                `${Math.floor(seconds / 60)}分${seconds % 60}秒` : 
+                `${seconds}秒`;
+            console.log(`通知「${name}」を${timeText}後にセットしました`);
+        }
+
+        // 通知を作成する関数
+        function createNotification(appName, title, message) {
+            // ブラウザのネイティブ通知を表示
+            showBrowserNotification(appName, title, message);
+
+            // Web上の通知も表示
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = 'notification info';
+            notification.id = `notification-${Date.now()}`;
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ja-JP', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+
+            notification.innerHTML = `
+                <button class="notification-close" onclick="removeNotification('${notification.id}')">&times;</button>
+                <div class="notification-header">
+                    <div class="notification-icon">⏰</div>
+                    <div class="notification-app">${appName}</div>
+                    <div class="notification-time">${timeString}</div>
+                </div>
+                <div class="notification-title">${title}</div>
+                <div class="notification-message">${message}</div>
+            `;
+
+            container.appendChild(notification);
+
+            // 5秒後に自動削除
+            setTimeout(() => {
+                removeNotification(notification.id);
+            }, 5000);
+        }
+
+        // ブラウザのネイティブ通知を表示する関数
+        function showBrowserNotification(appName, title, message) {
+            // 通知の許可を確認
+            if ('Notification' in window) {
+                if (Notification.permission === 'granted') {
+                    // 通知を作成
+                    const notification = new Notification(`⏰ ${title}`, {
+                        body: message,
+                        icon: getNotificationIcon(),
+                        tag: `timer-${Date.now()}`,
+                        requireInteraction: false,
+                        silent: true
+                    });
+
+                    // 通知をクリックした時の動作
+                    notification.onclick = function() {
+                        window.focus();
+                        this.close();
+                    };
+
+                    // 5秒後に自動で閉じる
+                    setTimeout(() => {
+                        notification.close();
+                    }, 5000);
+
+                } else if (Notification.permission !== 'denied') {
+                    // 許可を再度求める
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            showBrowserNotification(appName, title, message);
+                        }
+                    });
+                }
+            }
+        }
+
+        // 通知アイコンを取得する関数
+        function getNotificationIcon() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // 青い背景
+            ctx.fillStyle = '#007AFF';
+            ctx.fillRect(0, 0, 64, 64);
+            
+            // 白い時計マーク
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(32, 32, 20, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            ctx.fillStyle = '#007AFF';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('⏰', 32, 40);
+            
+            return canvas.toDataURL();
+        }
+
+        // 通知を削除する関数
+        function removeNotification(id) {
+            const notification = document.getElementById(id);
+            if (notification) {
+                notification.classList.add('removing');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }
+        }
+
+        // タイマーを削除する関数
+        function removeTimer(id) {
+            const index = activeTimers.findIndex(timer => timer.id === id);
+            if (index !== -1) {
+                clearTimeout(activeTimers[index].timeoutId);
+                activeTimers.splice(index, 1);
+                updateTimerDisplay();
+            }
+        }
+
+        // 全てのタイマーをキャンセルする関数
+        function cancelAllTimers() {
+            activeTimers.forEach(timer => {
+                clearTimeout(timer.timeoutId);
+            });
+            activeTimers = [];
+            updateTimerDisplay();
+            console.log('全てのタイマーをキャンセルしました');
+        }
+
+        // タイマー表示を更新する関数
+        function updateTimerDisplay() {
+            const container = document.getElementById('activeTimers');
+            
+            if (activeTimers.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = '<h3>アクティブなタイマー</h3>';
+            
+            activeTimers.forEach(timer => {
+                const timerElement = document.createElement('div');
+                timerElement.className = 'timer-item';
+                const timeText = timer.seconds >= 60 ? 
+                    `${Math.floor(timer.seconds / 60)}分${timer.seconds % 60}秒` : 
+                    `${timer.seconds}秒`;
+                timerElement.innerHTML = `
+                    <div class="timer-info">
+                        <div class="timer-name">${timer.name}</div>
+                        <div class="timer-countdown" id="countdown-${timer.id}">
+                            ${timeText}後に通知
+                        </div>
+                    </div>
+                    <button class="cancel-btn" onclick="removeTimer(${timer.id})">キャンセル</button>
+                `;
+                container.appendChild(timerElement);
+            });
+        }
+
+        // カウントダウン表示を更新する関数
+        function updateCountdowns() {
+            activeTimers.forEach(timer => {
+                const element = document.getElementById(`countdown-${timer.id}`);
+                if (element) {
+                    const elapsed = Date.now() - timer.startTime;
+                    const remaining = (timer.seconds * 1000) - elapsed;
+                    
+                    if (remaining > 0) {
+                        const totalSeconds = Math.floor(remaining / 1000);
+                        if (totalSeconds >= 60) {
+                            const minutes = Math.floor(totalSeconds / 60);
+                            const seconds = totalSeconds % 60;
+                            element.textContent = `残り ${minutes}分${seconds}秒`;
+                        } else {
+                            element.textContent = `残り ${totalSeconds}秒`;
+                        }
+                    }
+                }
+            });
+        }
+
+        // 1秒ごとにカウントダウンを更新
+        setInterval(updateCountdowns, 1000);
+
+        // ページ読み込み時の処理
+        window.addEventListener('load', () => {
+            // 通知許可を求める
+            requestNotificationPermission();
+        });
+
+        // 通知許可を求める関数
+        function requestNotificationPermission() {
+            if ('Notification' in window) {
+                if (Notification.permission === 'default') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            console.log('通知の許可が得られました');
+                        } else {
+                            console.log('通知の許可が拒否されました');
+                        }
+                    });
+                } else if (Notification.permission === 'denied') {
+                    alert('通知がブロックされています。ブラウザの設定で通知を許可してください。');
+                }
+            } else {
+                alert('このブラウザは通知をサポートしていません。');
+            }
+        }
+    </script>
+</body>
+</html>
